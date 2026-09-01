@@ -35,7 +35,7 @@ import ru.school21.tictactoe.web.model.PlayerResponse
 import java.util.Base64
 import java.util.UUID
 
-data class SignUpRequest(val login: String, val password: String)
+data class SignUpRequest(val login: String?, val password: String?)
 
 private fun parseBoard(value: String): List<List<String>> =
     value.removePrefix("[[").removeSuffix("]]").split("],[").map { row ->
@@ -115,11 +115,13 @@ fun Application.configureTicTacToe() {
         route("/auth") {
             post("/signup") {
                 val request = call.receive<SignUpRequest>()
-                if (request.login.isBlank() || request.password.isBlank()) {
+                val login = request.login?.trim()
+                val password = request.password?.trim()
+                if (login.isNullOrBlank() || password.isNullOrBlank()) {
                     call.respond(HttpStatusCode.BadRequest, mapOf("message" to "Login and password are required"))
                     return@post
                 }
-                if (!auth.register(request.login.trim(), request.password)) {
+                if (!auth.register(login, password)) {
                     call.respond(HttpStatusCode.Conflict, mapOf("message" to "Login already exists"))
                     return@post
                 }
@@ -142,11 +144,8 @@ fun Application.configureTicTacToe() {
 
         get("/games") {
             val header = call.request.headers[HttpHeaders.Authorization]
-            val credentials = header?.takeIf { it.startsWith("Basic ") }?.let {
-                runCatching { String(Base64.getDecoder().decode(it.removePrefix("Basic ").trim()), Charsets.UTF_8) }.getOrNull()
-            }
-            val userUuid = credentials?.let { auth.login(it) }
-            if (userUuid == null) {
+            val userUuid = header?.takeIf { it.startsWith("Bearer ") }?.removePrefix("Bearer ")?.trim()
+            if (userUuid.isNullOrBlank()) {
                 call.respond(HttpStatusCode.Unauthorized)
                 return@get
             }
@@ -159,19 +158,24 @@ fun Application.configureTicTacToe() {
 
         post("/games") {
             val header = call.request.headers[HttpHeaders.Authorization]
-            val credentials = header?.takeIf { it.startsWith("Basic ") }?.let {
-                runCatching { String(Base64.getDecoder().decode(it.removePrefix("Basic ").trim()), Charsets.UTF_8) }.getOrNull()
+            val userUuid = header?.takeIf { it.startsWith("Bearer ") }?.removePrefix("Bearer ")?.trim()
+            if (userUuid.isNullOrBlank()) {
+                call.respond(HttpStatusCode.Unauthorized)
+                return@post
             }
-            val userUuid = credentials?.let { auth.login(it) }
-            if (userUuid == null) {
+            // Get login from database since we only have UUID
+            val userLogin = transaction {
+                Users.select { Users.uuid eq userUuid }.firstOrNull()?.let { it[Users.login] }
+            }
+            if (userLogin == null) {
                 call.respond(HttpStatusCode.Unauthorized)
                 return@post
             }
             val request = call.receive<CreateGameRequest>()
             val players = if (request.againstComputer) {
-                listOf(PlayerResponse(userUuid, credentials.substringBefore(":"), "X"), PlayerResponse("computer", "Computer", "O"))
+                listOf(PlayerResponse(userUuid, userLogin, "X"), PlayerResponse("computer", "Computer", "O"))
             } else {
-                listOf(PlayerResponse(userUuid, credentials.substringBefore(":"), "X"))
+                listOf(PlayerResponse(userUuid, userLogin, "X"))
             }
             val game = GameResponse(
                 uuid = UUID.randomUUID().toString(),
@@ -196,11 +200,8 @@ fun Application.configureTicTacToe() {
 
         post("/games/{uuid}/join") {
             val header = call.request.headers[HttpHeaders.Authorization]
-            val credentials = header?.takeIf { it.startsWith("Basic ") }?.let {
-                runCatching { String(Base64.getDecoder().decode(it.removePrefix("Basic ").trim()), Charsets.UTF_8) }.getOrNull()
-            }
-            val userUuid = credentials?.let { auth.login(it) }
-            if (userUuid == null) {
+            val userUuid = header?.takeIf { it.startsWith("Bearer ") }?.removePrefix("Bearer ")?.trim()
+            if (userUuid.isNullOrBlank()) {
                 call.respond(HttpStatusCode.Unauthorized)
                 return@post
             }
@@ -221,7 +222,14 @@ fun Application.configureTicTacToe() {
                 call.respond(HttpStatusCode.Conflict, mapOf("message" to "You are already in this game"))
                 return@post
             }
-            val players = game.players + PlayerResponse(userUuid, credentials.substringBefore(":"), "O")
+            val userLogin = transaction {
+                Users.select { Users.uuid eq userUuid }.firstOrNull()?.let { it[Users.login] }
+            }
+            if (userLogin == null) {
+                call.respond(HttpStatusCode.Unauthorized)
+                return@post
+            }
+            val players = game.players + PlayerResponse(userUuid, userLogin, "O")
             val updatedGame = game.copy(state = "TURN", currentTurn = game.players.first().uuid, players = players)
             transaction {
                 Games.update({ Games.uuid eq gameUuid }) {
@@ -235,10 +243,8 @@ fun Application.configureTicTacToe() {
 
         get("/games/{uuid}") {
             val header = call.request.headers[HttpHeaders.Authorization]
-            val credentials = header?.takeIf { it.startsWith("Basic ") }?.let {
-                runCatching { String(Base64.getDecoder().decode(it.removePrefix("Basic ").trim()), Charsets.UTF_8) }.getOrNull()
-            }
-            if (credentials?.let { auth.login(it) } == null) {
+            val userUuid = header?.takeIf { it.startsWith("Bearer ") }?.removePrefix("Bearer ")?.trim()
+            if (userUuid.isNullOrBlank()) {
                 call.respond(HttpStatusCode.Unauthorized)
                 return@get
             }
@@ -256,11 +262,8 @@ fun Application.configureTicTacToe() {
 
         post("/games/{uuid}/move") {
             val header = call.request.headers[HttpHeaders.Authorization]
-            val credentials = header?.takeIf { it.startsWith("Basic ") }?.let {
-                runCatching { String(Base64.getDecoder().decode(it.removePrefix("Basic ").trim()), Charsets.UTF_8) }.getOrNull()
-            }
-            val userUuid = credentials?.let { auth.login(it) }
-            if (userUuid == null) {
+            val userUuid = header?.takeIf { it.startsWith("Bearer ") }?.removePrefix("Bearer ")?.trim()
+            if (userUuid.isNullOrBlank()) {
                 call.respond(HttpStatusCode.Unauthorized)
                 return@post
             }
