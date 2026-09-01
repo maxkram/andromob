@@ -1,0 +1,516 @@
+{
+  "info": {
+    "name": "Tic-Tac-Toe Ktor API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080"
+    },
+    {
+      "key": "gameId1",
+      "value": "550e8400-e29b-41d4-a716-446655440010"
+    },
+    {
+      "key": "gameId2",
+      "value": "550e8400-e29b-41d4-a716-446655440020"
+    },
+    {
+      "key": "sequenceGameId",
+      "value": "550e8400-e29b-41d4-a716-446655440030"
+    },
+    {
+      "key": "sequenceBoard",
+      "value": "[[0,0,0],[0,0,0],[0,0,0]]"
+    }
+  ],
+  "item": [
+    {
+      "name": "Independent games",
+      "item": [
+        {
+          "name": "Game 1 - first move in center",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"board\":[[0,0,0],[0,1,0],[0,0,0]]}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/game/{{gameId1}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "game",
+                "{{gameId1}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response has one human move and one computer move', function () {",
+                  "    const body = pm.response.json();",
+                  "    const cells = body.board.flat();",
+                  "    pm.expect(cells.filter(cell => cell === 1).length).to.eql(1);",
+                  "    pm.expect(cells.filter(cell => cell === 2).length).to.eql(1);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Game 2 - first move in top-left corner",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"board\":[[1,0,0],[0,0,0],[0,0,0]]}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/game/{{gameId2}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "game",
+                "{{gameId2}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('A different game ID is returned', function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.id).to.eql(pm.collectionVariables.get('gameId2'));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Sequential game",
+      "item": [
+        {
+          "name": "1. Start a new game",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"board\":[[0,0,0],[0,1,0],[0,0,0]]}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/game/{{sequenceGameId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "game",
+                "{{sequenceGameId}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "const body = pm.response.json();",
+                  "pm.collectionVariables.set('sequenceBoard', JSON.stringify(body.board));"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "2. Add human move automatically",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const board = JSON.parse(pm.collectionVariables.get('sequenceBoard'));",
+                  "let moveAdded = false;",
+                  "",
+                  "for (let row = 0; row < 3 && !moveAdded; row++) {",
+                  "    for (let column = 0; column < 3 && !moveAdded; column++) {",
+                  "        if (board[row][column] === 0) {",
+                  "            board[row][column] = 1;",
+                  "            moveAdded = true;",
+                  "        }",
+                  "    }",
+                  "}",
+                  "",
+                  "if (!moveAdded) {",
+                  "    throw new Error('There are no empty cells for a human move');",
+                  "}",
+                  "",
+                  "pm.variables.set('requestBoard', JSON.stringify(board));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "const body = pm.response.json();",
+                  "pm.collectionVariables.set('sequenceBoard', JSON.stringify(body.board));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"board\":{{requestBoard}}}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/game/{{sequenceGameId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "game",
+                "{{sequenceGameId}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "3. Add next human move automatically",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const board = JSON.parse(pm.collectionVariables.get('sequenceBoard'));",
+                  "let moveAdded = false;",
+                  "",
+                  "for (let row = 0; row < 3 && !moveAdded; row++) {",
+                  "    for (let column = 0; column < 3 && !moveAdded; column++) {",
+                  "        if (board[row][column] === 0) {",
+                  "            board[row][column] = 1;",
+                  "            moveAdded = true;",
+                  "        }",
+                  "    }",
+                  "}",
+                  "",
+                  "if (!moveAdded) {",
+                  "    throw new Error('There are no empty cells for a human move');",
+                  "}",
+                  "",
+                  "pm.variables.set('requestBoard', JSON.stringify(board));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "const body = pm.response.json();",
+                  "pm.collectionVariables.set('sequenceBoard', JSON.stringify(body.board));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"board\":{{requestBoard}}}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/game/{{sequenceGameId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "game",
+                "{{sequenceGameId}}"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Validation errors",
+      "item": [
+        {
+          "name": "Invalid UUID",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"board\":[[0,0,0],[0,1,0],[0,0,0]]}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/game/not-a-uuid",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "game",
+                "not-a-uuid"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 400', function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Empty board: no human move",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"board\":[[0,0,0],[0,0,0],[0,0,0]]}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/game/550e8400-e29b-41d4-a716-446655440040",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "game",
+                "550e8400-e29b-41d4-a716-446655440040"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 400', function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Wrong board size",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"board\":[[0,0],[0,1]]}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/game/550e8400-e29b-41d4-a716-446655440041",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "game",
+                "550e8400-e29b-41d4-a716-446655440041"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 400', function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Wrong cell value",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"board\":[[0,0,0],[0,9,0],[0,0,0]]}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/game/550e8400-e29b-41d4-a716-446655440042",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "game",
+                "550e8400-e29b-41d4-a716-446655440042"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 400', function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Change saved computer move",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"board\":[[1,0,0],[0,1,0],[0,0,0]]}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/game/{{gameId1}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "game",
+                "{{gameId1}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 400', function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        }
+      ]
+    }
+  ]
+}
